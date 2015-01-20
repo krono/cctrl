@@ -23,7 +23,8 @@ from cctrl.settings import VERSION
 from pycclib import cclib
 from cctrl.error import InputErrorException, messages
 from cctrl.auth import get_email, get_password, update_tokenfile, \
-    delete_tokenfile, read_tokenfile, get_email_env, get_password_env
+    delete_tokenfile, read_tokenfile, get_email_env, get_password_env, \
+    get_email_userfile
 
 from cctrl.app import ParseAppDeploymentName
 
@@ -83,33 +84,49 @@ def get_email_and_password(settings):
     try:
         email = get_email_env(settings)
     except KeyError:
-        email = get_email(settings)
+        email = get_email_userfile()
+        if not email:
+            email = get_email(settings)
 
     try:
         password = get_password_env(settings)
     except KeyError:
-        password = get_password()
+        # SSH Public Key Auth
+        password = None
 
     return email, password
+
+
+def create_token(api, email, password):
+    while True:
+        try:
+
+            api.create_token(email, password)
+        except cclib.UnauthorizedError:
+            if password:
+                sys.exit(messages['NotAuthorized'])
+
+            print('Public Key authentication failed. Trying with password.')  # TODO Add to error.py
+            password = get_password()
+        else:
+            return
+
+
+def execute_command(api, command, settings):
+    try:
+        command()
+    except (cclib.TokenRequiredError, cclib.UnauthorizedError):
+        email, password = get_email_and_password(settings)
+        create_token(api, email, password)
+    except ParseAppDeploymentName:
+        sys.exit(messages['InvalidAppOrDeploymentName'])
 
 
 def execute_with_authenticated_user(api, command, settings):
     while True:
         try:
-            try:
-                command()
-            except (cclib.TokenRequiredError, cclib.UnauthorizedError):
-                email, password = get_email_and_password(settings)
-                try:
-                    api.create_token(email, password)
-                except cclib.UnauthorizedError:
-                    sys.exit(messages['NotAuthorized'])
-                else:
-                    pass
-            except ParseAppDeploymentName:
-                sys.exit(messages['InvalidAppOrDeploymentName'])
-            else:
-                break
+            execute_command(api, command, settings)
+            return
         except cclib.ForbiddenError, e:
             sys.exit(messages['NotAllowed'])
         except cclib.ConnectionException:

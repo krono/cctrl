@@ -123,6 +123,13 @@ def get_email_env(settings):
     return email
 
 
+def get_email_userfile():
+    userfile = open(USER_FILE_PATH)
+    data = json.load(userfile)
+    userfile.close()
+    return data.get('email')
+
+
 def get_password(create=False):
     password = None
     for i in range(3):
