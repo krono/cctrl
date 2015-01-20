@@ -28,7 +28,17 @@ except ImportError:
     import simplejson as json
 
 from cctrl.error import messages, PasswordsDontMatchException
-from cctrl.settings import TOKEN_FILE_PATH, HOME_PATH
+from cctrl.settings import TOKEN_FILE_PATH, HOME_PATH, CONFIG_FILE_PATH
+
+
+def create_config_dir():
+    if os.path.isdir(HOME_PATH):
+        return
+    elif os.path.isfile(HOME_PATH):
+        print 'Error: ' + HOME_PATH + ' is a file, not a directory.'
+        sys.exit(1)
+    else:
+        os.mkdir(HOME_PATH)
 
 
 def update_tokenfile(api):
@@ -69,13 +79,7 @@ def write_tokenfile(api):
         users home exists or is a file. If not, we create it and then
         write the token file.
     """
-    if os.path.isdir(HOME_PATH):
-        pass
-    elif os.path.isfile(HOME_PATH):
-        print 'Error: ' + HOME_PATH + ' is a file, not a directory.'
-        sys.exit(1)
-    else:
-        os.mkdir(HOME_PATH)
+    create_config_dir()
 
     tokenfile = open(TOKEN_FILE_PATH, "w")
     json.dump(api.get_token(), tokenfile)
@@ -93,13 +97,57 @@ def delete_tokenfile():
     return False
 
 
+def create_configfile(email):
+    create_config_dir()
+
+    content = {'email': email}
+
+    userfile = open(CONFIG_FILE_PATH, 'w')
+    json.dump(content, userfile)
+    userfile.close()
+    return True
+
+
+def get_email_and_password(settings):
+    email = get_email_env(settings)
+    if not email:
+        email = get_email(settings)
+
+    password = get_password_env(settings)
+    if not password:
+        password = get_password()
+
+    return email, password
+
+
 def get_email(settings):
     sys.stderr.write(settings.login_name)
     sys.stderr.flush()
 
     email = raw_input()
-
+    create_configfile(email)
     return email
+
+
+def get_email_env(settings):
+    try:
+        email = os.environ.pop(settings.login_creds['email'])
+    except KeyError:
+        return None
+
+    create_configfile(email)
+    return email
+
+
+def get_email_userfile():
+    try:
+        configfile = open(CONFIG_FILE_PATH)
+    except IOError:
+        return None
+
+    data = json.load(configfile)
+    configfile.close()
+    return data.get('email')
 
 
 def get_password(create=False):
@@ -120,6 +168,15 @@ def get_password(create=False):
     return password
 
 
+def get_password_env(settings):
+    try:
+        password = os.environ.pop(settings.login_creds['pwd'])
+    except KeyError:
+        return None
+
+    return password
+
+
 def get_credentials(settings, create=False):
     """
         We use this to ask the user for his credentials in case we have no
@@ -129,7 +186,7 @@ def get_credentials(settings, create=False):
         after that a PasswordsDontMatchException is thrown.
     """
 
-    email = get_email();
+    email = get_email()
 
     password = get_password(create)
 

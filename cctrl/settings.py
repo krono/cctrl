@@ -21,6 +21,7 @@ from cctrl.version import __version__
 HOME_PATH = os.path.abspath(os.path.expanduser('~/.cloudControl'))
 TOKEN_FILE_NAME = os.environ.get('CCTRL_TOKEN_FILE', 'token.json')
 TOKEN_FILE_PATH = os.path.join(HOME_PATH, TOKEN_FILE_NAME)
+CONFIG_FILE_PATH = os.path.join(HOME_PATH, 'config.json')
 VERSION = __version__
 CONFIG_ADDON = os.getenv('CONFIG_ADDON', 'config.free')
 
